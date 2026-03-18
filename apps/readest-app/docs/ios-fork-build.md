@@ -130,6 +130,93 @@ xcrun altool --upload-app --type ios --file src-tauri/gen/apple/build/arm64/Read
 - Replace updater endpoints before distributing builds publicly.
 - If you plan to publish on TestFlight/App Store, review all product IDs under `src/hooks/useAvailablePlans.ts` because they currently reference upstream IAP identifiers.
 
+## 9. GitHub Actions secrets for Windows users
+
+If you do not have a Mac locally, use the GitHub workflow `.github/workflows/ios-ipa.yml`.
+
+Set these in your fork under `Settings` -> `Secrets and variables` -> `Actions`.
+
+Repository secrets:
+
+- `APPLE_TEAM_ID`
+- `APPLE_CERTIFICATE`
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_SIGNING_IDENTITY`
+- `APPLE_PROVISIONING_PROFILE` (recommended for device-installable development IPAs)
+
+Repository variables:
+
+- `IOS_BUNDLE_IDENTIFIER`
+- `IOS_DBUS_ID`
+
+Recommended values for this fork:
+
+```text
+IOS_BUNDLE_IDENTIFIER=de.christophreinhardt.readest
+IOS_DBUS_ID=de.christophreinhardt.readest
+```
+
+### How to create `APPLE_CERTIFICATE`
+
+You need access to a Mac once for this step.
+
+1. Sign in to Xcode with your Apple Developer account.
+2. Ensure an `Apple Development` certificate exists in Keychain Access.
+3. In `Keychain Access` -> `My Certificates`, find:
+   `Apple Development: Your Name (TEAM_ID)`
+4. Export that certificate including the private key as `.p12`.
+5. Choose an export password.
+6. Base64-encode the file and store the result in GitHub as `APPLE_CERTIFICATE`.
+
+PowerShell encoding example:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\ios-dev-cert.p12")) | Set-Clipboard
+```
+
+Use the export password as `APPLE_CERTIFICATE_PASSWORD`.
+
+Use the exact certificate name as `APPLE_SIGNING_IDENTITY`, for example:
+
+```text
+Apple Development: Christoph Reinhardt (ABCDE12345)
+```
+
+### How to create `APPLE_PROVISIONING_PROFILE`
+
+For sideloading to a real iPhone, a development provisioning profile is strongly recommended.
+
+1. Go to the Apple Developer portal.
+2. Register your target iPhone under `Devices`.
+3. Create an App ID for your fork bundle ID, for example:
+   `de.christophreinhardt.readest`
+4. Create an iOS App Development provisioning profile for that App ID.
+5. Include:
+   - your `Apple Development` certificate
+   - your target iPhone device
+6. Download the resulting `.mobileprovision` file.
+7. Base64-encode it and store the result in GitHub as `APPLE_PROVISIONING_PROFILE`.
+
+PowerShell encoding example:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\fork-dev.mobileprovision")) | Set-Clipboard
+```
+
+### How to run the workflow
+
+1. Open your fork on GitHub.
+2. Go to `Actions`.
+3. Run `Build iOS IPA for Sideloading`.
+4. Download the generated `.ipa` artifact.
+5. Install it on Windows with Sideloadly.
+
+If the workflow fails at signing, the most common mismatch is:
+
+- bundle ID in GitHub variable does not match the provisioning profile
+- certificate does not belong to the same Apple team
+- target iPhone is not included in the provisioning profile
+
 ## Current status of this fork branch
 
 The branch `feat/ios-gesture-brightness-color-temp` contains the iOS reader gesture change:

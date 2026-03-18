@@ -135,6 +135,38 @@ jobs:
           security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
 
+      - name: Install provisioning profile
+        env:
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+        run: |
+          if [ -z "$APPLE_PROVISIONING_PROFILE" ]; then
+            echo "APPLE_PROVISIONING_PROFILE not set; continuing without an explicit provisioning profile"
+            exit 0
+          fi
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          python - <<'PY'
+          import base64
+          import os
+          import plistlib
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          encoded = os.environ["APPLE_PROVISIONING_PROFILE"]
+          raw = base64.b64decode(encoded)
+          tmp = Path(tempfile.gettempdir()) / "profile.mobileprovision"
+          tmp.write_bytes(raw)
+          xml = subprocess.check_output(
+              ["security", "cms", "-D", "-i", str(tmp)],
+              text=False,
+          )
+          profile = plistlib.loads(xml)
+          uuid = profile["UUID"]
+          target = Path.home() / "Library" / "MobileDevice" / "Provisioning Profiles" / f"{uuid}.mobileprovision"
+          target.write_bytes(raw)
+          print(f"Installed provisioning profile: {target}")
+          PY
+
       - name: Initialize iOS project
         working-directory: apps/readest-app
         run: pnpm tauri ios init --ci
