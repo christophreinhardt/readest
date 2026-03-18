@@ -1,0 +1,182 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build
+        required: false
+        default: feat/ios-gesture-brightness-color-temp
+      export_method:
+        description: iOS export method
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - ad-hoc
+          - app-store-connect
+
+jobs:
+  build-ios-ipa:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    env:
+      NEXT_PUBLIC_APP_PLATFORM: tauri
+      IOS_BUNDLE_IDENTIFIER: ${{ vars.IOS_BUNDLE_IDENTIFIER || 'de.christophreinhardt.readest' }}
+      IOS_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      IOS_DBUS_ID: ${{ vars.IOS_DBUS_ID || 'de.christophreinhardt.readest' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ios-ipa-cargo
+
+      - name: Validate iOS signing configuration
+        run: |
+          if [ -z "$IOS_APPLE_TEAM_ID" ]; then
+            echo "Missing secret APPLE_TEAM_ID"
+            exit 1
+          fi
+
+      - name: Install JavaScript dependencies
+        run: pnpm install
+
+      - name: Prepare web vendor assets
+        run: pnpm --filter @readest/readest-app setup-vendors
+
+      - name: Create local env file for app build
+        run: |
+          cat > apps/readest-app/.env.local <<EOF
+          NEXT_PUBLIC_APP_PLATFORM=tauri
+          DBUS_ID=${IOS_DBUS_ID}
+          EOF
+
+      - name: Create fork-specific iOS Tauri config
+        run: |
+          cat > apps/readest-app/src-tauri/tauri.ios.ci.conf.json <<EOF
+          {
+            "\$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+            "productName": "Readest Fork",
+            "mainBinaryName": "readest",
+            "identifier": "${IOS_BUNDLE_IDENTIFIER}",
+            "version": "../package.json",
+            "build": {
+              "frontendDist": "../out",
+              "devUrl": "http://localhost:3000",
+              "beforeDevCommand": "pnpm dev",
+              "beforeBuildCommand": "pnpm build"
+            },
+            "bundle": {
+              "active": true,
+              "targets": "all",
+              "category": "Productivity",
+              "icon": [
+                "icons/32x32.png",
+                "icons/128x128.png",
+                "icons/128x128@2x.png",
+                "icons/icon.icns",
+                "icons/icon.ico"
+              ],
+              "resources": [],
+              "iOS": {
+                "developmentTeam": "${IOS_APPLE_TEAM_ID}",
+                "infoPlist": "./Info-ios.plist",
+                "minimumSystemVersion": "15.0"
+              },
+              "createUpdaterArtifacts": false
+            },
+            "plugins": {
+              "updater": {
+                "endpoints": []
+              }
+            }
+          }
+          EOF
+
+      - name: Import Apple certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ] || [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            echo "Missing APPLE_CERTIFICATE or APPLE_CERTIFICATE_PASSWORD"
+            exit 1
+          fi
+          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          python - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          cert = os.environ["APPLE_CERTIFICATE"]
+          out = Path(os.environ["RUNNER_TEMP"]) / "build_certificate.p12"
+          out.write_bytes(base64.b64decode(cert))
+          PY
+          security create-keychain -p runner "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p runner "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+      - name: Initialize iOS project
+        working-directory: apps/readest-app
+        run: pnpm tauri ios init --ci
+
+      - name: Build IPA
+        working-directory: apps/readest-app
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_SIGNING_IDENTITY" ]; then
+            echo "Missing APPLE_SIGNING_IDENTITY"
+            exit 1
+          fi
+          pnpm tauri ios build --export-method "${{ inputs.export_method }}" --config src-tauri/tauri.ios.ci.conf.json
+
+      - name: Collect IPA artifact
+        id: collect
+        run: |
+          IPA_PATH=$(find apps/readest-app/src-tauri/gen/apple/build -name '*.ipa' | head -n 1)
+          if [ -z "$IPA_PATH" ]; then
+            echo "No IPA file found"
+            exit 1
+          fi
+          echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: readest-ios-ipa-${{ github.run_number }}
+          path: ${{ steps.collect.outputs.ipa_path }}
+          if-no-files-found: error
+          retention-days: 7
