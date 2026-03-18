@@ -1,4 +1,4 @@
-name: Build iOS IPA
+name: Build iOS IPA for Sideloading
 
 on:
   workflow_dispatch:
@@ -7,15 +7,6 @@ on:
         description: Git ref to build
         required: false
         default: feat/ios-gesture-brightness-color-temp
-      export_method:
-        description: iOS export method
-        required: true
-        default: development
-        type: choice
-        options:
-          - development
-          - ad-hoc
-          - app-store-connect
 
 jobs:
   build-ios-ipa:
@@ -153,15 +144,13 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=8192
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -z "$APPLE_SIGNING_IDENTITY" ]; then
             echo "Missing APPLE_SIGNING_IDENTITY"
             exit 1
           fi
-          pnpm tauri ios build --export-method "${{ inputs.export_method }}" --config src-tauri/tauri.ios.ci.conf.json
+          pnpm tauri ios build --export-method development --config src-tauri/tauri.ios.ci.conf.json
 
       - name: Collect IPA artifact
         id: collect
