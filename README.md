@@ -196,6 +196,9 @@ pnpm tauri ios dev
 pnpm tauri ios dev --host
 ```
 
+For a personal fork with your own Apple Developer account, use the fork-specific guide:
+[apps/readest-app/docs/ios-fork-build.md](./apps/readest-app/docs/ios-fork-build.md)
+
 ### 5. Build for Production
 
 ```bash
