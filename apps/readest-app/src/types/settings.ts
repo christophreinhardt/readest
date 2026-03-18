@@ -82,6 +82,7 @@ export interface SystemSettings {
   autoCheckUpdates: boolean;
   screenWakeLock: boolean;
   screenBrightness: number;
+  screenColorTemperature: number;
   autoScreenBrightness: boolean;
   alwaysShowStatusBar: boolean;
   alwaysInForeground: boolean;

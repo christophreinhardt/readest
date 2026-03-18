@@ -83,6 +83,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   autoCheckUpdates: true,
   screenWakeLock: false,
   screenBrightness: -1, // -1~100, -1 for system default
+  screenColorTemperature: 0, // -100~100, warm to cool
   autoScreenBrightness: true,
   openLastBooks: false,
   lastOpenBooks: [],

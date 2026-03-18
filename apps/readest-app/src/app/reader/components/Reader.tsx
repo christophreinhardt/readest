@@ -67,6 +67,7 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
   const { isNotebookVisible, isNotebookPinned } = useNotebookStore();
   const { getIsNotebookVisible, setNotebookVisible } = useNotebookStore();
   const { isDarkMode, systemUIAlwaysHidden, isRoundedWindow } = useThemeStore();
+  const screenColorTemperature = settings.screenColorTemperature ?? 0;
 
   useTheme({ systemUIVisible: settings.alwaysShowStatusBar, appThemeColor: 'base-100' });
   useScreenWakeLock(settings.screenWakeLock);
@@ -161,12 +162,24 @@ const Reader: React.FC<{ ids?: string }> = ({ ids }) => {
   return libraryLoaded && settings.globalReadSettings ? (
     <div
       className={clsx(
-        'reader-page bg-base-100 text-base-content full-height select-none overflow-hidden',
+        'reader-page bg-base-100 text-base-content full-height relative select-none overflow-hidden',
         appService?.hasRoundedWindow && isRoundedWindow && 'window-border rounded-window',
       )}
     >
       <Suspense fallback={<div className='full-height'></div>}>
         <ReaderContent ids={ids} settings={settings} />
+        {screenColorTemperature !== 0 && (
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-0 z-[5]'
+            style={{
+              backgroundColor:
+                screenColorTemperature > 0 ? 'rgb(96 165 250)' : 'rgb(255 153 102)',
+              mixBlendMode: 'soft-light',
+              opacity: Math.min(Math.abs(screenColorTemperature) / 100, 1) * 0.4,
+            }}
+          />
+        )}
         <AboutWindow />
         <UpdaterWindow />
         <KOSyncSettingsWindow />
