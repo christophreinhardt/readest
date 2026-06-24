@@ -15,11 +15,11 @@ jobs:
       SCCACHE_GHA_ENABLED: 'true'
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: 'true'
       - name: setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install minimal stable with clippy and rustfmt
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -27,7 +27,7 @@ jobs:
           override: true
           components: rustfmt, clippy
       - name: Cache apt packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /var/cache/apt/archives
           key: apt-rust-lint-${{ runner.os }}
@@ -45,12 +45,12 @@ jobs:
   build_web_app:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: 'true'
 
       - name: setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: setup node
         uses: actions/setup-node@v6
@@ -59,7 +59,7 @@ jobs:
           cache: pnpm
 
       - name: cache Next.js build
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: apps/readest-app/.next/cache
           key: nextjs-web-${{ github.sha }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -100,12 +100,12 @@ jobs:
       SCCACHE_GHA_ENABLED: 'true'
       RUSTC_WRAPPER: sccache
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: 'true'
 
       - name: setup pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: setup node
         uses: actions/setup-node@v6
@@ -114,7 +114,7 @@ jobs:
           cache: pnpm
 
       - name: cache Next.js build
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: apps/readest-app/.next/cache
           key: nextjs-tauri-${{ github.sha }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -128,7 +128,7 @@ jobs:
           pnpm install && pnpm setup-vendors
 
       - name: setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -141,7 +141,7 @@ jobs:
           cache-all-crates: 'true'
 
       - name: Cache apt packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: /var/cache/apt/archives
           key: apt-tauri-${{ runner.os }}
